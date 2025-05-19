@@ -1,2 +1,3 @@
 (library
- (name note))
+ (name tui)
+ (libraries unix))
