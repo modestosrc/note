@@ -35,13 +35,19 @@ let get_cursor_position () =
     else (-1, -1)
   with _ -> (-1, -1)
 
-let set_cursor_position (row, col) =
-  Printf.printf "\027[%d;%dH%!" row col
+let set_cursor_position (row, col) = Printf.printf "\027[%d;%dH%!" row col
 
-let print_and_exit str =
-  let original = terminal_setup () in
-  print_endline str;
-  terminal_reset original
+let insert_mode () =
+  let buffer = Buffer.create 32 in
+  let rec loop () =
+    let c = input_char stdin in
+    match c with
+    | '\n' -> Buffer.contents buffer
+    | c ->
+        Buffer.add_char buffer c;
+        loop ()
+  in
+  loop ()
 
 let set_collor colot =
   let color_code =
@@ -76,22 +82,47 @@ let draw_checklist items selected =
   in
   aux items
 
-let checklist items =
+let check_item items id =
+  let rec aux items =
+    match items with
+    | [] -> []
+    | (i, checked, item) :: rest ->
+        if i = id then
+          if checked then (i, false, item) :: rest else (i, true, item) :: rest
+        else (i, checked, item) :: aux rest
+  in
+  aux items
+
+let checklist () =
+  Filerepository.create_dir_and_file ();
   let original = terminal_setup () in
   let cursor_pos = get_cursor_position () in
   let rec loop selected =
+    let items = Filerepository.read_file_repository () in
+    draw_checklist items selected;
     set_cursor_position cursor_pos;
     if selected < 0 then loop (List.length items - 1)
     else if selected >= List.length items then loop 0
-    else (
-      draw_checklist items selected;
+    else
       let c = input_char stdin in
       match c with
-      | 'j' -> loop (selected + 1)
-      | 'k' -> loop (selected - 1)
+      | 'k' -> loop (selected + 1)
+      | 'j' -> loop (selected - 1)
+      | 'i' ->
+          set_cursor_position cursor_pos;
+          print_string "Insert new item: ";
+          let new_item = insert_mode () in
+          let items = Filerepository.read_file_repository () in
+          let new_id = List.length items in
+          let new_items = (new_id, false, new_item) :: items in
+          Filerepository.write_file_repository new_items;
+          loop selected
+      | '\n' ->
+          check_item items selected |> Filerepository.write_file_repository;
+          loop selected
       | 'q' ->
           terminal_reset original;
           exit 0
-      | _ -> loop selected)
+      | _ -> loop selected
   in
   loop 0

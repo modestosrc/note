@@ -1,3 +1,8 @@
 (library
  (name tui)
- (libraries unix))
+ (modules tui)
+ (libraries unix filerepository))
+(library
+  (name filerepository)
+  (modules filerepository)
+  (libraries unix yojson))
