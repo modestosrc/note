@@ -9,7 +9,7 @@ let create_dir_and_file () =
     close_out oc);
   if not (Sys.file_exists file_path) then (
     let oc = open_out file_path in
-    Yojson.Basic.to_channel oc (`List []);
+    Yojson.Basic.to_channel oc (`List [ `Assoc [ ("id", `Int 0); ("checked", `Bool false); ("item", `String "Bem vindo") ] ]);
     close_out oc)
 
 let read_file_repository () =
@@ -28,7 +28,8 @@ let read_file_repository () =
          let item = Yojson.Basic.Util.(to_string (member "item" x)) in
          (id, checked, item))
 
-  [@@@ocaml.warning "-32"]
+[@@@ocaml.warning "-32"]
+
 let write_file_repository items =
   let json =
     `List
@@ -45,3 +46,14 @@ let write_file_repository items =
   let oc = open_out file_path in
   Yojson.Basic.to_channel oc json;
   close_out oc
+
+let insert_item index item =
+  let items = read_file_repository () in
+  let items = List.filter (fun (i, _, _) -> i <> index) items in
+  let items = List.map (fun (i, b, it) ->
+    if i >= index then (i + 1, b, it)
+    else (i, b, it)
+  ) items in
+  let items = (index, false, item) :: items in
+  let items = List.sort (fun (i1, _, _) (i2, _, _) -> compare i1 i2) items in
+  write_file_repository items
