@@ -1,5 +1,3 @@
-
-(* Set terminal to raw mode *)
 let terminal_setup () =
   let fd = Unix.stdin in
   let terminal_original_settings = Unix.tcgetattr fd in
@@ -10,7 +8,6 @@ let terminal_setup () =
   Unix.tcsetattr fd TCSANOW raw;
   terminal_original_settings
 
-(* Reset terminal to original settings *)
 let terminal_restore terminal_original_settings =
   let fd = Unix.stdin in
   Unix.tcsetattr fd TCSANOW terminal_original_settings
@@ -40,9 +37,9 @@ let insert_mode () =
   in
   read_input ()
 
-let set_collor colot =
+let set_color color =
   let color_code =
-    match colot with
+    match color with
     | `Red -> "\x1b[31m"
     | `Green -> "\x1b[32m"
     | `Yellow -> "\x1b[33m"
@@ -55,7 +52,7 @@ let set_collor colot =
 
 let draw_checklist items selected =
   clear_screen ();
-  set_collor `White;
+  set_color `White;
   set_cursor_position (0, 0);
   let rec aux items =
     match items with
@@ -63,13 +60,13 @@ let draw_checklist items selected =
     | (id, checked, item) :: rest ->
         if selected = id then (
           let checkmark = if checked then "[x] " else "[ ] " in
-          set_collor `Blue;
+          set_color `Blue;
           print_string (checkmark ^ item);
           print_newline ();
           aux rest)
         else
           let checkmark = if checked then "[x] " else "[ ] " in
-          set_collor `White;
+          set_color `White;
           print_string (checkmark ^ item);
           print_newline ();
           aux rest
@@ -78,7 +75,7 @@ let draw_checklist items selected =
 
 let draw_checklist_insert items new_id =
   clear_screen ();
-  set_collor `White;
+  set_color `White;
   set_cursor_position (0, 0);
   let rec aux items =
     match items with
@@ -86,15 +83,16 @@ let draw_checklist_insert items new_id =
     | (id, checked, item) :: rest ->
         if new_id = id then (
           let checkmark = if checked then "[x] " else "[ ] " in
-          set_collor `Blue;
+          set_color `Blue;
           print_string "[ ] ";
           print_newline ();
           print_string (checkmark ^ item);
+          set_color `White;
           print_newline ();
           aux rest)
         else
           let checkmark = if checked then "[x] " else "[ ] " in
-          set_collor `White;
+          set_color `White;
           print_string (checkmark ^ item);
           print_newline ();
           aux rest
@@ -112,44 +110,67 @@ let check_item items id =
   in
   aux items
 
-let input_controller () = 
+let menu_input () =
   match input_char stdin with
   | 'j' -> `Down
   | 'k' -> `Up
   | 'i' -> `Insert
+  | 'p' -> `Paste
   | 'd' -> `Delete
   | '\n' -> `Enter
   | 'q' -> `Quit
   | _ -> `Unknown
 
+let buffer = ref None
+
+let wrap_index idx len =
+  if idx < 0 then len - 1 else if idx >= len then 0 else idx
+
+let handle_down selected items = wrap_index (selected + 1) (List.length items)
+let handle_up selected items = wrap_index (selected - 1) (List.length items)
+
+let handle_insert selected items =
+  let new_index = selected + 1 in
+  draw_checklist_insert items new_index;
+  set_cursor_position (new_index + 1, 5);
+  let new_item = insert_mode () in
+  Filerepository.insert_item new_index new_item;
+  wrap_index (selected + 1) (List.length items + 1)
+
+let handle_delete selected =
+  buffer := Filerepository.get_item selected;
+  Filerepository.remove_item selected;
+  if selected = 0 then 0 else selected - 1
+
+let handle_paste selected items =
+  match !buffer with
+  | Some (_, _, item) ->
+      let new_index = selected + 1 in
+      Filerepository.insert_item new_index item;
+      wrap_index (selected + 1) (List.length items + 1)
+  | None -> selected
+
+let handle_enter items selected =
+  check_item items selected |> Filerepository.write_file_repository;
+  selected
+
+let handle_quit terminal_original_settings =
+  terminal_restore terminal_original_settings;
+  exit 0
 
 let checklist terminal_original_settings =
   Filerepository.create_dir_and_file ();
   let rec loop selected =
     let items = Filerepository.read_file_repository () in
     draw_checklist items selected;
-    if selected < 0 then loop (List.length items - 1)
-    else if selected >= List.length items then loop 0
-    else
-      match input_controller () with
-      | `Down -> loop (selected + 1)
-      | `Up -> loop (selected - 1)
-      | `Insert ->
-          let new_index = selected + 1 in
-          draw_checklist_insert items new_index;
-          set_cursor_position (new_index + 1, 5);
-          let new_item = insert_mode () in
-          Filerepository.insert_item new_index new_item;
-          loop (selected + 1)
-      | `Delete ->
-          Filerepository.remove_item selected;
-          loop (if selected = 0 then 0 else selected - 1)
-      | `Enter ->
-          check_item items selected |> Filerepository.write_file_repository;
-          loop selected
-      | `Quit ->
-          terminal_restore terminal_original_settings;
-          exit 0
-      | `Unknown -> loop selected
+    match menu_input () with
+    | `Down -> loop (handle_down selected items)
+    | `Up -> loop (handle_up selected items)
+    | `Insert -> loop (handle_insert selected items)
+    | `Delete -> loop (handle_delete selected)
+    | `Paste -> loop (handle_paste selected items)
+    | `Enter -> loop (handle_enter items selected)
+    | `Quit -> handle_quit terminal_original_settings
+    | `Unknown -> loop selected
   in
   loop 0

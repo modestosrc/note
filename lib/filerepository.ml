@@ -74,4 +74,10 @@ let rm_item_list id =
 
 let insert_item index item = new_item_list index item |> write_file_repository
 
+let get_item index =
+  let items = read_file_repository () in
+  try
+    Some (List.find (fun (i, _, _) -> i = index) items)
+  with Not_found -> None
+
 let remove_item index = rm_item_list index |> write_file_repository
