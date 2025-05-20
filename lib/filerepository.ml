@@ -2,14 +2,19 @@ let file_path = Sys.getenv "HOME" ^ "/.local/share/note/notes.json"
 
 let create_dir_and_file () =
   let dir_path = Filename.dirname file_path in
-  if not (Sys.file_exists dir_path) then (
-    Unix.mkdir dir_path 0o755;
-    let oc = open_out file_path in
-    Yojson.Basic.to_channel oc (`List []);
-    close_out oc);
+  if not (Sys.file_exists dir_path) then Unix.mkdir dir_path 0o755;
   if not (Sys.file_exists file_path) then (
     let oc = open_out file_path in
-    Yojson.Basic.to_channel oc (`List [ `Assoc [ ("id", `Int 0); ("checked", `Bool false); ("item", `String "Bem vindo") ] ]);
+    Yojson.Basic.to_channel oc
+      (`List
+         [
+           `Assoc
+             [
+               ("id", `Int 0);
+               ("checked", `Bool false);
+               ("item", `String "Bem vindo");
+             ];
+         ]);
     close_out oc)
 
 let read_file_repository () =
@@ -44,16 +49,29 @@ let write_file_repository items =
          items)
   in
   let oc = open_out file_path in
-  Yojson.Basic.to_channel oc json;
+  Yojson.Basic.pretty_to_channel oc json;
   close_out oc
 
-let insert_item index item =
+(* Add a new item to the list maintaining the IDs correctly sorted *)
+let new_item_list id content =
   let items = read_file_repository () in
-  let items = List.filter (fun (i, _, _) -> i <> index) items in
-  let items = List.map (fun (i, b, it) ->
-    if i >= index then (i + 1, b, it)
-    else (i, b, it)
-  ) items in
-  let items = (index, false, item) :: items in
-  let items = List.sort (fun (i1, _, _) (i2, _, _) -> compare i1 i2) items in
-  write_file_repository items
+  let new_item = (id, false, content) in
+  let updated_items =
+    List.map
+      (fun (i, checked, item) ->
+        if i >= id then (i + 1, checked, item) else (i, checked, item))
+      items
+    @ [ new_item ]
+  in
+  List.sort (fun (id1, _, _) (id2, _, _) -> compare id1 id2) updated_items
+
+(* Remove an item from the list and update the IDs *)
+let rm_item_list id =
+  let items = read_file_repository () in
+  List.filter (fun (i, _, _) -> i <> id) items
+  |> List.map (fun (i, checked, item) ->
+         if i > id then (i - 1, checked, item) else (i, checked, item))
+
+let insert_item index item = new_item_list index item |> write_file_repository
+
+let remove_item index = rm_item_list index |> write_file_repository
