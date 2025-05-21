@@ -24,16 +24,17 @@ let insert_mode () =
     let c = input_char stdin in
     print_string (String.make 1 c);
     flush stdout;
-    if c = '\n' then Buffer.contents buffer
-    else if c = '\b' || c = Char.chr 127 then (
-      if Buffer.length buffer > 0 then (
-        Buffer.truncate buffer (Buffer.length buffer - 1);
-        print_string "\b \b";
-        flush stdout);
-      read_input ())
-    else (
-      Buffer.add_char buffer c;
-      read_input ())
+    match c with
+    | '\n' -> Buffer.contents buffer
+    | '\b' | '\127' ->
+        if Buffer.length buffer > 0 then (
+          Buffer.truncate buffer (Buffer.length buffer - 1);
+          print_string "\b \b";
+          flush stdout);
+        read_input ()
+    | _ ->
+        Buffer.add_char buffer c;
+        read_input ()
   in
   read_input ()
 
@@ -50,65 +51,36 @@ let set_color color =
   in
   print_string color_code
 
-let draw_checklist items selected =
+let draw_checklist_helper items selected new_id =
   clear_screen ();
   set_color `White;
   set_cursor_position (0, 0);
-  let rec aux items =
-    match items with
-    | [] -> ()
-    | (id, checked, item) :: rest ->
-        if selected = id then (
-          let checkmark = if checked then "[x] " else "[ ] " in
-          set_color `Blue;
-          print_string (checkmark ^ item);
-          print_newline ();
-          aux rest)
-        else
-          let checkmark = if checked then "[x] " else "[ ] " in
-          set_color `White;
-          print_string (checkmark ^ item);
-          print_newline ();
-          aux rest
-  in
-  aux items
+  List.iter
+    (fun (id, checked, item) ->
+      let checkmark = if checked then "[x] " else "[ ] " in
+      if selected = id || new_id = id then (
+        set_color `Blue;
+        print_string (checkmark ^ item);
+        print_newline ();
+        if new_id = id then (
+          print_string "[ ] ";
+          print_newline ()))
+      else (
+        set_color `White;
+        print_string (checkmark ^ item);
+        print_newline ()))
+    items
+
+let draw_checklist items selected = draw_checklist_helper items selected (-1)
 
 let draw_checklist_insert items new_id =
-  clear_screen ();
-  set_color `White;
-  set_cursor_position (0, 0);
-  let rec aux items =
-    match items with
-    | [] -> ()
-    | (id, checked, item) :: rest ->
-        if new_id = id then (
-          let checkmark = if checked then "[x] " else "[ ] " in
-          set_color `Blue;
-          print_string "[ ] ";
-          print_newline ();
-          print_string (checkmark ^ item);
-          set_color `White;
-          print_newline ();
-          aux rest)
-        else
-          let checkmark = if checked then "[x] " else "[ ] " in
-          set_color `White;
-          print_string (checkmark ^ item);
-          print_newline ();
-          aux rest
-  in
-  aux items
+  draw_checklist_helper items (-1) new_id
 
 let check_item items id =
-  let rec aux items =
-    match items with
-    | [] -> []
-    | (i, checked, item) :: rest ->
-        if i = id then
-          if checked then (i, false, item) :: rest else (i, true, item) :: rest
-        else (i, checked, item) :: aux rest
-  in
-  aux items
+  List.map
+    (fun (i, checked, item) ->
+      if i = id then (i, not checked, item) else (i, checked, item))
+    items
 
 let menu_input () =
   match input_char stdin with
