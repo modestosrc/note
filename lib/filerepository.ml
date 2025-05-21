@@ -1,9 +1,12 @@
-let file_path = Sys.getenv "HOME" ^ "/.local/share/note/notes.json"
+let file_path =
+  match Sys.getenv_opt "HOME" with
+  | Some home -> home ^ "/.local/share/note/notes.json"
+  | None -> failwith "HOME environment variable not set"
 
 let create_dir_and_file () =
   let dir_path = Filename.dirname file_path in
   if not (Sys.file_exists dir_path) then Unix.mkdir dir_path 0o755;
-  if not (Sys.file_exists file_path) then (
+  if not (Sys.file_exists file_path) then
     let oc = open_out file_path in
     Yojson.Basic.to_channel oc
       (`List
@@ -15,14 +18,17 @@ let create_dir_and_file () =
                ("item", `String "Bem vindo");
              ];
          ]);
-    close_out oc)
+    close_out oc
 
 let read_file_repository () =
-  if not (Sys.file_exists file_path) then (
+  if not (Sys.file_exists file_path) then
     let oc = open_out file_path in
     Yojson.Basic.to_channel oc (`List []);
-    close_out oc);
-  let ic = open_in file_path in
+    close_out oc;
+  let ic =
+    try open_in file_path
+    with Sys_error _ -> failwith "Failed to open file repository"
+  in
   let json = really_input_string ic (in_channel_length ic) in
   close_in ic;
   Yojson.Basic.from_string json
