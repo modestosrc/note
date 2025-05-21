@@ -89,6 +89,7 @@ let menu_input () =
   | 'i' -> `Insert
   | 'p' -> `Paste
   | 'd' -> `Delete
+  | 'y' -> `Yank
   | '\n' -> `Enter
   | 'q' -> `Quit
   | _ -> `Unknown
@@ -122,6 +123,10 @@ let handle_paste selected items =
       wrap_index (selected + 1) (List.length items + 1)
   | None -> selected
 
+let handle_yank selected =
+  buffer := Filerepository.get_item selected;
+  selected
+
 let handle_enter items selected =
   check_item items selected |> Filerepository.write_file_repository;
   selected
@@ -141,6 +146,7 @@ let checklist terminal_original_settings =
     | `Insert -> loop (handle_insert selected items)
     | `Delete -> loop (handle_delete selected)
     | `Paste -> loop (handle_paste selected items)
+    | `Yank -> loop (handle_yank selected)
     | `Enter -> loop (handle_enter items selected)
     | `Quit -> handle_quit terminal_original_settings
     | `Unknown -> loop selected
