@@ -6,7 +6,7 @@ let file_path =
 let create_dir_and_file () =
   let dir_path = Filename.dirname file_path in
   if not (Sys.file_exists dir_path) then Unix.mkdir dir_path 0o755;
-  if not (Sys.file_exists file_path) then
+  if not (Sys.file_exists file_path) then (
     let oc = open_out file_path in
     Yojson.Basic.to_channel oc
       (`List
@@ -18,13 +18,13 @@ let create_dir_and_file () =
                ("item", `String "Bem vindo");
              ];
          ]);
-    close_out oc
+    close_out oc)
 
 let read_file_repository () =
-  if not (Sys.file_exists file_path) then
+  if not (Sys.file_exists file_path) then (
     let oc = open_out file_path in
     Yojson.Basic.to_channel oc (`List []);
-    close_out oc;
+    close_out oc);
   let ic =
     try open_in file_path
     with Sys_error _ -> failwith "Failed to open file repository"
@@ -38,8 +38,6 @@ let read_file_repository () =
          let checked = Yojson.Basic.Util.(to_bool (member "checked" x)) in
          let item = Yojson.Basic.Util.(to_string (member "item" x)) in
          (id, checked, item))
-
-[@@@ocaml.warning "-32"]
 
 let write_file_repository items =
   let json =
@@ -82,8 +80,7 @@ let insert_item index item = new_item_list index item |> write_file_repository
 
 let get_item index =
   let items = read_file_repository () in
-  try
-    Some (List.find (fun (i, _, _) -> i = index) items)
+  try Some (List.find (fun (i, _, _) -> i = index) items)
   with Not_found -> None
 
 let remove_item index = rm_item_list index |> write_file_repository
