@@ -12,10 +12,6 @@ let terminal_restore terminal_original_settings =
   let fd = Unix.stdin in
   Unix.tcsetattr fd TCSANOW terminal_original_settings
 
-let clear_screen () =
-  print_string "\027[2J\027[H%!";
-  flush stdout
-
 let set_cursor_position (row, col) = Printf.printf "\027[%d;%dH%!" row col
 
 let insert_mode () =
@@ -52,24 +48,32 @@ let set_color color =
   print_string color_code
 
 let draw_checklist_helper items selected new_id =
-  clear_screen ();
-  set_color `White;
+  let term_size = Unix.ioctl_get_winsize Unix.stdout in
+  let term_height = term_size.Unix.ws_row in
+  let term_width = term_size.Unix.ws_col in
+  let rec draw_items items idx =
+    match items with
+    | [] -> ()
+    | (id, checked, item) :: rest ->
+        let checkmark = if checked then "[x] " else "[ ] " in
+        if selected = id || new_id = id then (
+          set_color `Blue;
+          print_string (checkmark ^ item);
+          print_newline ();
+          if new_id = id then (
+            print_string "[ ] ";
+            print_newline ()))
+        else (
+          set_color `White;
+          print_string (checkmark ^ item);
+          print_newline ());
+        if idx < term_height - 1 then draw_items rest (idx + 1)
+        else (
+          print_newline ();
+          draw_items rest 0)
+  in
   set_cursor_position (0, 0);
-  List.iter
-    (fun (id, checked, item) ->
-      let checkmark = if checked then "[x] " else "[ ] " in
-      if selected = id || new_id = id then (
-        set_color `Blue;
-        print_string (checkmark ^ item);
-        print_newline ();
-        if new_id = id then (
-          print_string "[ ] ";
-          print_newline ()))
-      else (
-        set_color `White;
-        print_string (checkmark ^ item);
-        print_newline ()))
-    items
+  draw_items items 0
 
 let draw_checklist items selected = draw_checklist_helper items selected (-1)
 
