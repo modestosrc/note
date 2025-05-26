@@ -16,6 +16,28 @@ let clear_screen () =
   print_string "\027[2J\027[H%!";
   flush stdout
 
+(*
+let get_cursor_position () =
+  Printf.printf "\027[6n%!";
+  let buffer = Bytes.create 32 in
+  let rec read_loop i =
+    if i < 32 then (
+      let c = input_char stdin in
+      Bytes.set buffer i c;
+      if c = 'R' then Bytes.sub_string buffer 0 (i + 1) else read_loop (i + 1))
+    else Bytes.sub_string buffer 0 i
+  in
+  let response = read_loop 0 in
+  try
+    if response.[0] = '\027' && response.[1] = '[' then
+      let rc = String.sub response 2 (String.length response - 3) in
+      match String.split_on_char ';' rc with
+      | [ row; col ] -> (int_of_string row, int_of_string col)
+      | _ -> (-1, -1)
+    else (-1, -1)
+  with _ -> (-1, -1)
+*)
+
 let set_cursor_position (row, col) = Printf.printf "\027[%d;%dH%!" row col
 
 let insert_mode () =
@@ -72,9 +94,7 @@ let draw_checklist_helper items selected new_id =
     items
 
 let draw_checklist items selected = draw_checklist_helper items selected (-1)
-
-let draw_checklist_insert items new_id =
-  draw_checklist_helper items (-1) new_id
+let draw_checklist_insert items new_id = draw_checklist_helper items (-1) new_id
 
 let check_item items id =
   List.map
