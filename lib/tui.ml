@@ -122,52 +122,57 @@ let wrap_index idx len =
 let handle_down selected items = wrap_index (selected + 1) (List.length items)
 let handle_up selected items = wrap_index (selected - 1) (List.length items)
 
-let handle_insert selected items =
+let handle_insert name selected items =
   let new_index = selected + 1 in
   draw_checklist_insert items new_index;
   set_cursor_position (new_index + 1, 5);
   let new_item = insert_mode () in
-  Filerepository.insert_item new_index new_item;
+  Filerepository.insert_item name new_index new_item;
   wrap_index (selected + 1) (List.length items + 1)
 
-let handle_delete selected =
-  buffer := Filerepository.get_item selected;
-  Filerepository.remove_item selected;
+let handle_delete name selected =
+  buffer := Filerepository.get_item name selected;
+  Filerepository.remove_item name selected;
   if selected = 0 then 0 else selected - 1
 
-let handle_paste selected items =
+let handle_paste name selected items =
   match !buffer with
   | Some (_, _, item) ->
       let new_index = selected + 1 in
-      Filerepository.insert_item new_index item;
+      Filerepository.insert_item name new_index item;
       wrap_index (selected + 1) (List.length items + 1)
   | None -> selected
 
-let handle_yank selected =
-  buffer := Filerepository.get_item selected;
+let handle_yank name selected =
+  buffer := Filerepository.get_item name selected;
   selected
 
-let handle_enter items selected =
-  check_item items selected |> Filerepository.write_file_repository;
+let handle_enter name items selected =
+  check_item items selected |> Filerepository.write_file_repository name;
   selected
 
 let handle_quit terminal_original_settings =
   terminal_restore terminal_original_settings;
   exit 0
 
-let checklist terminal_original_settings =
-  Filerepository.create_dir_and_file ();
+let handle_name = function
+  | Some name -> name ^ ".json"
+  | None -> "notes.json"
+
+let checklist terminal_original_settings name =
+  let name = handle_name name in
+  Filerepository.create_dir_and_file name;
   let rec loop selected =
-    let items = Filerepository.read_file_repository () in
+    let items = Filerepository.read_file_repository name in
     draw_checklist items selected;
     match menu_input () with
     | `Down -> loop (handle_down selected items)
     | `Up -> loop (handle_up selected items)
-    | `Insert -> loop (handle_insert selected items)
-    | `Delete -> loop (handle_delete selected)
-    | `Paste -> loop (handle_paste selected items)
-    | `Yank -> loop (handle_yank selected)
-    | `Enter -> loop (handle_enter items selected)
+    | `Insert -> loop (handle_insert name selected items)
+    | `Delete -> loop (handle_delete name selected)
+    | `Paste -> loop (handle_paste name selected items)
+    | `Yank -> loop (handle_yank name selected)
+    | `Enter -> loop (handle_enter name items selected)
     | `Quit -> handle_quit terminal_original_settings
     | `Unknown -> loop selected
   in
