@@ -70,17 +70,25 @@ let new_item_list name id content =
   List.sort (fun (id1, _, _) (id2, _, _) -> compare id1 id2) updated_items
 
 (* Remove an item from the list and update the IDs *)
+(* 
+   O codigo quebra caso a lista nao tenha pelo menos um item
+   HACK: Caso tente remover o ultimo item da lista, retorna a lista original
+*)
 let rm_item_list name id =
-  let items = read_file_repository name in
-  List.filter (fun (i, _, _) -> i <> id) items
-  |> List.map (fun (i, checked, item) ->
-         if i > id then (i - 1, checked, item) else (i, checked, item))
+  let list = read_file_repository name in
+  if List.length list = 1 then list
+  else
+    List.filter (fun (i, _, _) -> i <> id) list
+    |> List.map (fun (i, checked, item) ->
+           if i > id then (i - 1, checked, item) else (i, checked, item))
 
-let insert_item name index item = new_item_list name index item |> write_file_repository name
+let insert_item name index item =
+  new_item_list name index item |> write_file_repository name
 
 let get_item name index =
   let items = read_file_repository name in
   try Some (List.find (fun (i, _, _) -> i = index) items)
   with Not_found -> None
 
-let remove_item name index = rm_item_list name index |> write_file_repository name
+let remove_item name index =
+  rm_item_list name index |> write_file_repository name

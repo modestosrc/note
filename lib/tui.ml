@@ -155,9 +155,7 @@ let handle_quit terminal_original_settings =
   terminal_restore terminal_original_settings;
   exit 0
 
-let handle_name = function
-  | Some name -> name ^ ".json"
-  | None -> "notes.json"
+let handle_name = function Some name -> name ^ ".json" | None -> "notes.json"
 
 let checklist terminal_original_settings name =
   let name = handle_name name in
